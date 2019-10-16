@@ -1,0 +1,387 @@
+---
+title: "ML- Transport Prediction"
+author: "Sindhuja Hariharan"
+date: "October 16, 2019"
+output: word_document
+---
+The problem statement shows that the response variable has three classes.The following algorithms holds good for multi-class classification problems.
+
+1.	Linear Discriminant Analysis
+2.	Support Vector Machine
+3.	CART
+4.	K-Nearest Neighbour
+5.	Naïve Bayes
+	
+Here, we have used the four models to find out the best one for the given problem with high accuracy.
+
+DATA EXPLORATION:
+================
+	The data is initially read and the analysis of the variables is done.
+
+
+```{r}
+setwd("C:\\Users\\kausik\\Documents\\Sindhu\\PGP BABI\\Machine learning\\Group Assignment")
+car = read.csv("Cars.csv")
+str(car)
+```
+
+Then, the categorical variables are converted to factor variables.
+
+```{r}
+	car$MBA=as.factor(car$MBA)
+	car$Gender=as.factor(car$Gender)
+	car$Engineer=as.factor(car$Engineer)
+	car$license=as.factor(car$license)
+
+```
+Imputing Missing Values:
+=========================
+
+Then, the variables are checked for missing values.
+
+```{r}
+summary(car)
+```
+
+It is evident that the variable MBA has a missing value. Since it is a categorical variable, the missing value can be replaced with mode.
+
+```{r}
+	Mode <- function (x, na.rm) {
+   	xtab <- table(x)
+   	xmode <- names(which(xtab == max(xtab)))
+   	if (length(xmode) > 1)
+     	xmode <- ">1 mode"
+   	return(xmode)
+ 	}
+	for (var in 1:ncol(car)) {
+  	 if (class(car[,var])=="numeric") {
+   	  car[is.na(car[,var]),var] <- mean(car[,var], na.rm = TRUE)
+   	} else if (class(car[,var]) %in% c("character", "factor")) {
+   	  car[is.na(car[,var]),var] <- Mode(car[,var], na.rm = TRUE)
+   	}
+	}
+
+	table(car$MBA)
+```
+
+Splitting into training and test data: 
+==========================================
+	
+The data is split into training and the test and train data.
+
+```{r}
+set.seed(1234)
+	split<-sample.split(car$Transport, SplitRatio = 0.70)
+	train<-subset(car, split == TRUE)
+	test<-subset(car, split == FALSE)
+
+```
+
+
+LINEAR DISCRIMINANT ANALYSIS:
+=================================
+
+	When we use the linear discriminant analysis to develop a model for the given data, we get the following output.
+
+	
+```{r}
+
+library(MASS)
+	lda.model = lda (Transport~., data=train)
+	lda.model
+```
+
+.	Since the target variable has three classes, LDA produces two discriminant functions(LD1 and LD2). The first discriminant function captures the maximum variance. i.e.89.18%
+
+.	Here, in this model, we are car as the trying to explain the employee's decision to use car as the main means of transport.
+
+.	So, from the output we could clearly see that the variables which influence the employees to choose car as the means of transport are Engineer, Age, Salary, Work Experience and license to some extent.
+
+Model Accuracy:
+	The accuracy for the training data is 79.42%.
+	
+	
+```{r}
+predmodel.car.lda = predict(lda.model, data=train)
+	table(Predicted=predmodel.car.lda$class, train$Transport)
+lda<-table(Predicted=predmodel.car.lda$class, train$Transport)
+	accuracy.lda<-sum(diag(lda))/sum(lda)
+	accuracy.lda
+```
+
+The accuracy for the testing data is 75.93%.
+
+```{r}
+test.lda<-predict(lda.model,newdata=test)
+	table(Predicted=test.lda$class, test$Transport)
+lda.test<-table(Predicted=test.lda$class, test$Transport)
+ 	accuracy.lda.test<-sum(diag(lda.test))/sum(lda.test)
+	accuracy.lda.test
+```
+
+Prediction for the new data values:
+=========================================
+
+	When we try to predict the mode of transport for the given data values using LDA model, we get public transport as the predicted mode of transport.
+	
+```{r}
+newtest<-read.csv("car_test.csv",header=TRUE)
+ 	newtest$Gender=ifelse(newtest$Gender=="Male",0,1)
+	newtest$MBA=as.factor(newtest$MBA)
+	newtest$Gender=as.factor(newtest$Gender)
+	newtest$Engineer=as.factor(newtest$Engineer)
+ 	newtest$license=as.factor(newtest$license)
+ 	new1= predict(lda.model, newdata=newtest)
+ 	new1$class
+```
+
+But, considering the accuracy for the car alone as the means of transport it is 72.09% for the training data and 77.77% for the test data.
+
+
+
+CART:
+==========
+
+	Now, we try to build CART model for the given dataset.
+	
+```{r}
+library(rpart)
+	library(rpart.plot)
+	r.ctrl<-rpart.control(minsplit=50,minbucket=10,cp=0,xval=10)
+	m2<-rpart(formula=Transport ~ .,data=train,method="class",control=r.ctrl)
+	library(rattle)
+	library(RColorBrewer)
+	fancyRpartPlot(m2)
+	prp(m2)
+```
+
+
+Based on the CART model, the most important variables that influence the mode of transport are Salary, Distance, Age and Distance.
+
+
+Model Accuracy:
+	The accuracy for the training data is 82.63%.
+
+```{r}
+train$predict.class<-predict(m2,train,type="class")
+	train$predict.score<-predict(m2,train,type="prob")
+	View(train)
+ 	ptree<-table(train$Transport,train$predict.class)
+ 	accuracy.tree<-sum(diag(ptree))/sum(ptree)
+	accuracy.tree
+```
+
+The accuracy for the testing data is 79.69%.
+
+```{r}
+test$predict.class<-predict(m2,test,type="class")
+	ptree1<-table(test$Transport,test$predict.class)
+	accuracy.tree1<-sum(diag(ptree1))/sum(ptree1)
+	accuracy.tree1
+```
+
+When we try to predict the mode of transport for the given data values using CART, we get public transport as the predicted mode of transport.
+
+```{r}
+newtree= predict(m2, newdata=newtest)
+ 	newtest$predict.class<-predict(m2,newdata=newtest,type="class")
+ 	newtest$predict.score<-predict(m2,newdata=newtest,type="prob")
+ 	View(newtest)
+ 	newtest$predict.class
+```
+
+But, considering the accuracy for the car alone as the means of transport it is 93.02% for the training data and 94.44% for the test data.
+
+
+K-NEAREST NEIGHBOR:
+======================
+
+Normalization of Variables: 
+=============================
+
+	For K-Nearest Neighbor and the Support Vector Machine, the data has to be normalized before building the model.
+
+```{r}
+normalize<-function(x){
++   +return((x-min(x))/(max(x)-min(x)))}
+
+ 
+	 train<-transform(train, Work.Exp=ave(train$Work.Exp,FUN = normalize))
+	 train<-transform(train, Salary=ave(train$Salary,FUN = normalize))
+	 train<-transform(train, Distance=ave(train$Distance,FUN = normalize))
+	 train<-transform(train, Age=ave(train$Age,FUN = normalize))
+	 
+	 test<-transform(test, Work.Exp=ave(test$Work.Exp,FUN = normalize))
+	 test<-transform(test, Salary=ave(test$Salary,FUN = normalize))
+	 test<-transform(test, Distance=ave(test$Distance,FUN = normalize))
+	 test<-transform(test, Age=ave(test$Age,FUN = normalize))
+	 
+	str(train)
+
+	train$Male<-ifelse(train$Gender=="0",1,0)
+	train$Eng<-ifelse(train$Engineer=="1",1,0)
+	train$lic<-ifelse(train$lic=="1",1,0)
+	train$Masters<-ifelse(train$MBA=="1",1,0)
+ 
+	test$Male<-ifelse(test$Gender=="0",1,0)
+	test$Eng<-ifelse(test$Engineer=="1",1,0)
+	test$lic<-ifelse(test$lic=="1",1,0)
+	test$Masters<-ifelse(test$MBA=="1",1,0)
+
+```
+
+After Normalization, we have developed a model without the categorical variables as normalization doesn't have a great effect on them.
+
+The accuracy of the model with only the normalized numerical variables is 76.69%.
+
+Next, we develop the full model with all the variables.
+
+```{r}
+train.2fact<-train[,c(1,5,6,7,9)]
+ 	val.2fact<-test[,c(1,5,6,7,9)]
+ 	library(MASS)
+ 	library(class)
+ 	y_pred<-knn(train=train.2fact[,-5],test=val.2fact[-5],   cl=train.2fact[,5],k=23)
+ 	cm.knn<-table(val.2fact[,5],y_pred)
+ 	cm.knn
+
+```
+```{r}
+accuracy.cm.knn<-sum(diag(cm.knn))/sum(cm.knn)
+	accuracy.cm.knn
+
+```
+
+The accuracy of the full model with all the variables is 78.19%.
+```{r}
+y_p<-knn(train=test.count[,-5],test=newtest1, cl=test.count[,5],k=3)
+	 y_p
+```
+
+When we try to predict the mode of transport for the given data values using KNN, we get car as the predicted mode of transport unlike the other two models.
+
+But, considering the accuracy for the car alone as the means of transport it is 77.77% for the model with only the numerical variables and 72.22% for the model with all the variables.
+
+
+SUPPORT VECTOR MACHINE:
+========================
+
+	For support vector machine, we have to normalize the variables before we build up the model.
+	
+```{r}
+svm1 <- svm(Transport~., data=train.2fact, 
+	             method="C-classification",probability=TRUE, cost=10)
+	summary(svm1)
+```
+
+Model Accuracy:
+=================
+
+	The model accuracy considering all the variables is 76.69%.
+	
+```{r}
+prediction <- predict(svm1, val.2fact)
+	xtab <- table(val.2fact$Transport, prediction)	
+	xtab
+```
+```{r}
+accuracy.svm<-sum(diag(xtab))/sum(xtab)
+	accuracy.svm
+```
+```{r}
+	newtest1<-newtest[,c(1,5,6,7,9,10,11,12)]
+ 	newsvm= predict(svm1, newdata=newtest1)
+	newsvm
+
+```
+
+When we try to predict the mode of transport for the given data values using SVM, we get public transport as the predicted mode of transport.
+
+But, considering the accuracy for the car alone as the means of transport it is 77.77%.
+
+
+NAIVE BAYES ALGORITHM:
+==========================
+
+```{r}
+library(caret)
+library(e1071)
+NBclassifier=naiveBayes(Transport~., data=train)
+print(NBclassifier)
+
+```
+
+	Naïve Bayes has little importance in the multiclass classification problem.
+
+Model Accuracy:
+================
+```{r}
+trainPred=predict(NBclassifier, newdata = train, type = "class")
+	NaiveBayes=table(train$Transport,trainPred)
+	NaiveBayes
+accuracy.NaiveBayes<-sum(diag(NaiveBayes))/sum(NaiveBayes)
+	accuracy.NaiveBayes
+
+```
+The model accuracy for the training data is 78.77%.
+
+```{r}
+trainPred1=predict(NBclassifier, newdata = test, type = "class")
+	NaiveBayes1=table(test$Transport,trainPred1)
+ 	NaiveBayes1
+accuracy.NaiveBayes1<-sum(diag(NaiveBayes1))/sum(NaiveBayes1)
+	accuracy.NaiveBayes1
+Pred1=predict(NBclassifier, newdata = newtest, type = "class")
+	Pred1
+
+```
+
+When we try to predict the mode of transport for the given data values using Naïve Bayes, we get public transport as the predicted mode of transport.
+
+But, considering the accuracy for the car alone as the means of transport it is 81.39%.
+
+
+COMPARISION OF MODELS:
+============================
+ 	
+	When we compare the accuracy of the models,
+
+Model	Overall Accuracy
+===========================
+
+Linear Discriminant Analysis	  79.42%
+CART	                          89.63%
+K-Nearest Neighbor	            78.19%
+Support Vector Machine	        76.69%
+Naïve Bayes	                    78.77%    
+
+
+When we try to obtain the accuracy of the models in prediction of car as a mode of transport, the models provide following accuracy
+
+
+Linear Discriminant Analysis	  72.09%
+CART	                          93.03%
+K-Nearest Neighbor	            77.77%
+Support Vector Machine	        77.77%
+Naïve Bayes	                    81.39%
+
+
+From the accuracy values, CART could be the best model for this dataset. 
+
+In predicting the mode of transport for the two given records,
+
+
+Model	                                    Record1	            Record2
+Linear Discriminant Analysis	            Public Transport	  Public Transport
+CART	                                    Public Transport	  Public Transport
+K-Nearest Neighbor	                      Car	                Car
+Support Vector Machine	                  Public Transport	  Public Transport
+Naïve Bayes	                              Public Transport	  Public Transport
+
+
+
+So, we could conclude that Public transport could be the preferred mode for the given data values.
+
+
+
+
